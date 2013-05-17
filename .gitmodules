@@ -1,0 +1,3 @@
+[submodule "libs/spider"]
+	path = libs/spider
+	url = git@github.com:duxins/php-spider.git
