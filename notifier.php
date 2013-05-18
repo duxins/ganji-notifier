@@ -5,17 +5,36 @@ define('LOGPATH', ABSPATH.'/logs');
 require_once(ABSPATH.'/libs/spider/Spider.php');
 require_once(ABSPATH.'/libs/PHPMailer/class.phpmailer.php');
 
+$dry_run = FALSE;
+$test_url = "";
+
 for($i=1; $i<$argc; $i++){
     switch($argv[$i]){
         case '-h':
         case '--help':
             show_usage();
             break;
+        case '-n':
+        case '--dry-run':
+            $dry_run = TRUE; 
+            break;
+        case '-u':
+        case '--url':
+            $test_url = @$argv[$i+1];
+            break;
     }
 }
 
 $notifier = new Notifier();
-$notifier->run();
+
+if($dry_run){
+    Notifier::log('DRY RUN');
+    $notifier->dry_run();
+}elseif($test_url){
+    $notifier->test_url($test_url);
+}else{
+    $notifier->run();
+}
 
 class Notifier{
     private $spiders;
@@ -47,18 +66,36 @@ class Notifier{
         $this->run($profile);
     }
 
+    public function test_url($url){
+        $this->test_mode = TRUE;
+        $spider = $this->choose_spider($url);
+        if(!$spider){
+            self::error("Can't parse $url!"); 
+            exit;
+        }
+
+        self::log('spider: '.get_class($spider)); 
+        $list = $spider->fetch($url);
+
+        self::log($list);
+    }
+
     private function _run($profile){
+        self::log('profile: '.$profile);
         $this->profile = $profile;
         $cfg = $this->config[$profile];
         $urls = $cfg['urls'];
 
         $items = array();
         foreach($urls as $url){
+            self::log('> url: '.$url);
             $spider = $this->choose_spider($url);
             if(!$spider){
-                echo "Can't parse $url";
+                self::error("> Can't parse $url!"); 
                 continue;
             }
+
+            self::log('> spider: '.get_class($spider)); 
 
             $list = $spider->fetch($url);
 
@@ -70,7 +107,9 @@ class Notifier{
             }
         }
 
-        $this->notify($items); 
+        if(!$this->test_mode){
+            $this->notify($items); 
+        }
     }
 
     private function notify($items){
@@ -114,9 +153,9 @@ class Notifier{
         $mail->IsHTML(true); 
         $mail->Subject = $subject;
         $mail->Body    = $body;
-
+        self::log('> Send email to: '.implode(',', $recipients));
         if(!$mail->Send()){
-            echo "Mailer Error:" . $mail->ErrorInfo;
+            self::error("> Error:" . $mail->ErrorInfo);
         }
 
         $logfile = LOGPATH.'/'.$this->profile.".log";
@@ -137,8 +176,14 @@ class Notifier{
         system($cmd, $status);
 
         if($status == 0){
-            echo "NOTIFIED\n";
+            if($this->test_mode){
+                self::error("> - $link");
+            }
             return TRUE;
+        }
+
+        if($this->test_mode){
+            self::ok("> + $link");
         }
 
         return FALSE;
@@ -150,7 +195,6 @@ class Notifier{
             $ignore = $cfg['ignore'];
             foreach($ignore as $w){
                 if(preg_match("#$w#", $text)){
-                    //echo "过滤 $w\n";
                     return FALSE;
                 }
             }
@@ -165,7 +209,6 @@ class Notifier{
                 if(preg_match("#^!#", $w)){
                     $w = preg_replace("#^!#", "", $w);
                     if(!preg_match("#$w#", $text)){
-                        //echo "不包含 $w\n";
                         return FALSE;
                     }
                 }elseif(preg_match("#$w#", $text)){
@@ -175,7 +218,6 @@ class Notifier{
                     $mismatched ++;
                 }
             }
-            
             if($matched > 0 || $mismatched == 0){
                 return TRUE;
             }else{
@@ -196,7 +238,6 @@ class Notifier{
         }
         return false;
     }
-    
     private function load_spiders(){
         $files = glob(ABSPATH.'/spiders/*.php'); 
         foreach($files as $file){
@@ -212,6 +253,23 @@ class Notifier{
         $this->config = $config;
         $this->settings = $settings;
     }
+
+    public static function log($msg, $newline = TRUE){
+        if(is_array($msg)){
+            print_r($msg);
+        }else{
+            echo $msg;
+        }
+        echo ($newline?"\n":"");
+    }
+
+    public static function error($msg, $newline = TRUE){
+        echo "\033[0;31m".$msg."\033[0m".($newline?"\n":"");
+    }
+
+    public static function ok($msg, $newline = TRUE){
+        echo "\033[0;32m".$msg."\033[0m".($newline?"\n":"");
+    }
 }
 
 function show_usage(){
@@ -222,6 +280,8 @@ function show_usage(){
     Options:
 
       -h, --help \tOutput usage information
+      -n, --dry-run
+      -u, --url <url> 
 
 ";
 }

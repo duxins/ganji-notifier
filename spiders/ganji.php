@@ -8,8 +8,6 @@ class Ganji{
     public function canParse($url){
         if(
             preg_match("#ganji\.com#isU", $url)
-            ||
-            preg_match("#localhost#", $url)
         ){
             return TRUE;
         }
