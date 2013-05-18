@@ -1,3 +1,6 @@
 [submodule "libs/spider"]
 	path = libs/spider
 	url = git@github.com:duxins/php-spider.git
+[submodule "libs/PHPMailer"]
+	path = libs/PHPMailer
+	url = git@github.com:duxins/PHPMailer.git
