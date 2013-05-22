@@ -8,8 +8,6 @@ class Wuba{
     public function canParse($url){
         if(
             preg_match("#58\.com#isU", $url)
-            ||
-            preg_match("#localhost#", $url)
         ){
             return TRUE;
         }
