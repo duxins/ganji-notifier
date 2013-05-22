@@ -19,6 +19,7 @@ class Ganji{
         $this->url = $url;
         $html = $this->spider->fetch($url);
 
+        $list = array();
         if(preg_match('#<dl\s+class="list-bigpic#isU', $html)){
             $list = $this->_parse_tpl_bigpic($html);
         }elseif(preg_match('#<dl\s+class="list-nopic#isU',$html)){
@@ -26,7 +27,6 @@ class Ganji{
         }
 
         return $list;
-
     }
 
     private function _parse_tpl_bigpic($html){
@@ -37,14 +37,13 @@ class Ganji{
         $list = array();
 
         foreach($matches as $item){
-            if(!preg_match('#<a href="([^<]*)" target="_blank" class="ft-tit">([^<]*)</a>#isU', $item[1], $match)){
+            if(!preg_match('#<a href="([^<]*)"[^>]*>([^<]*)</a>#isU', $item[1], $match)){
                 continue;
             }
 
             $link = preg_replace("/#(.*)$/isU","",$match[1]);
             $title = trim($match[2]);
 
-            $id = '';
             if(!preg_match('#\/(\w+)\.htm#', $link, $match)){
                 continue;
             }
