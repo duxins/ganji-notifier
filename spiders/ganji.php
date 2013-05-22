@@ -30,6 +30,7 @@ class Ganji{
     }
 
     private function _parse_tpl_bigpic($html){
+        $host = parse_url($this->url, PHP_URL_HOST);
         if(!preg_match_all("#<dl\s+class=\"list-bigpic[^>]*>(.*)</dl>#isU", $html, $matches, PREG_SET_ORDER)){
             return array();
         }
@@ -66,7 +67,7 @@ class Ganji{
 
             $list[] = array(
                 'id' => $id,
-                'link' => $link,
+                'link' => "http://$host".$link,
                 'title' => $title,
                 'time' => $time,
                 'desc' => $desc

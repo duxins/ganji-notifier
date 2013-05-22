@@ -108,6 +108,10 @@ class Notifier{
             }
         }
 
+        foreach($items as $item){
+            $this->logger->info($item['title']." ( ".$item['link']." ) ");
+        }
+
         if(!$this->test_mode){
             $this->notify($items); 
         }
