@@ -4,6 +4,7 @@ define('ABSPATH', dirname(__FILE__));
 define('LOGPATH', ABSPATH.'/logs');
 require_once(ABSPATH.'/libs/spider/Spider.php');
 require_once(ABSPATH.'/libs/PHPMailer/class.phpmailer.php');
+require_once(ABSPATH.'/libs/logger/Logger.php');
 
 $dry_run = FALSE;
 $test_url = "";
@@ -25,12 +26,9 @@ for($i=1; $i<$argc; $i++){
     }
 }
 
-$notifier = new Notifier();
+$notifier = new Notifier($dry_run);
 
-if($dry_run){
-    Notifier::log('DRY RUN');
-    $notifier->dry_run();
-}elseif($test_url){
+if($test_url){
     $notifier->test_url($test_url);
 }else{
     $notifier->run();
@@ -43,9 +41,17 @@ class Notifier{
     private  $test_mode = FALSE;
     private $profile = '';
 
-    public function __construct(){
+    public function __construct($dry_run=FALSE){
         $this->load_spiders();
         $this->load_config();
+
+        if($dry_run){
+            $this->test_mode = TRUE;
+            $this->logger = new Logger('DEBUG');
+        }else{
+            $this->logger = new Logger('INFO');
+        }
+
     }
 
     public function run($profile = ''){
@@ -54,48 +60,43 @@ class Notifier{
                 $this->_run($name);
             }
         }elseif(!isset($this->config[$profile])){
-            echo "profile $profile doesn't exist.";
+            $this->logger->error('Profile $profile doesn\'t exist.');
             exit(1);
         }else{
             $this->_run($profile);
         }
     }
 
-    public function dry_run($profile = ''){
-        $this->test_mode = TRUE;
-        $this->run($profile);
-    }
-
     public function test_url($url){
         $this->test_mode = TRUE;
         $spider = $this->choose_spider($url);
         if(!$spider){
-            self::error("Can't parse $url!"); 
+            $this->logger->error("Can't parse '$url'.");
             exit;
         }
 
-        self::log('spider: '.get_class($spider)); 
+        $this->logger->info("Spider: ".get_class($spider));
         $list = $spider->fetch($url);
 
-        self::log($list);
+        print_r($list);
     }
 
     private function _run($profile){
-        self::log('profile: '.$profile);
+        $this->logger->info("Profile: $profile");
         $this->profile = $profile;
         $cfg = $this->config[$profile];
         $urls = $cfg['urls'];
 
         $items = array();
         foreach($urls as $url){
-            self::log('> url: '.$url);
+            $this->logger->info("URL: $url");
             $spider = $this->choose_spider($url);
             if(!$spider){
-                self::error("> Can't parse $url!"); 
+                $this->logger->error("Cant't parse '$url'.");
                 continue;
             }
 
-            self::log('> spider: '.get_class($spider)); 
+            $this->logger->info('Spider: '.get_class($spider));
 
             $list = $spider->fetch($url);
 
@@ -150,12 +151,15 @@ class Notifier{
             $mail->AddAddress($item);
         }
 
-        $mail->IsHTML(true); 
+        $mail->IsHTML(true);
         $mail->Subject = $subject;
         $mail->Body    = $body;
-        self::log('> Send email to: '.implode(',', $recipients));
+
+        $this->logger->debug('Subject: '.$subject);
+        $this->logger->info('Sending email to: '. implode(', ', $recipients));
+
         if(!$mail->Send()){
-            self::error("> Error:" . $mail->ErrorInfo);
+            $this->logger->error($mail->ErrorInfo);
         }
 
         $logfile = LOGPATH.'/'.$this->profile.".log";
@@ -176,25 +180,22 @@ class Notifier{
         system($cmd, $status);
 
         if($status == 0){
-            if($this->test_mode){
-                self::error("> - $link");
-            }
+            $this->logger->debug("Not notified: $link ($item[title])");
             return TRUE;
         }
 
-        if($this->test_mode){
-            self::ok("> + $link");
-        }
-
+        $this->logger->debug("Notified: $link ($item[title]) - skip");
         return FALSE;
     }
 
     private function filter($text){
+        $this->logger->debug('Text: '.$text);
         $cfg = $this->config[$this->profile];
         if(isset($cfg['ignore'])){
             $ignore = $cfg['ignore'];
             foreach($ignore as $w){
                 if(preg_match("#$w#", $text)){
+                    $this->logger->debug("Keyword found: '$w' - skip");
                     return FALSE;
                 }
             }
@@ -209,12 +210,15 @@ class Notifier{
                 if(preg_match("#^!#", $w)){
                     $w = preg_replace("#^!#", "", $w);
                     if(!preg_match("#$w#", $text)){
+                        $this->logger->debug("Keyword not found: '$w'");
                         return FALSE;
                     }
                 }elseif(preg_match("#$w#", $text)){
                     //echo "匹配 $w\n";
+                    $this->logger->debug("Keyword found: '$w'");
                     $matched ++;
                 }else{
+                    $this->logger->debug("Keyword not found: '$w'");
                     $mismatched ++;
                 }
             }
@@ -238,6 +242,7 @@ class Notifier{
         }
         return false;
     }
+
     private function load_spiders(){
         $files = glob(ABSPATH.'/spiders/*.php'); 
         foreach($files as $file){
@@ -252,23 +257,6 @@ class Notifier{
         include_once(ABSPATH.'/config.php');
         $this->config = $config;
         $this->settings = $settings;
-    }
-
-    public static function log($msg, $newline = TRUE){
-        if(is_array($msg)){
-            print_r($msg);
-        }else{
-            echo $msg;
-        }
-        echo ($newline?"\n":"");
-    }
-
-    public static function error($msg, $newline = TRUE){
-        echo "\033[0;31m".$msg."\033[0m".($newline?"\n":"");
-    }
-
-    public static function ok($msg, $newline = TRUE){
-        echo "\033[0;32m".$msg."\033[0m".($newline?"\n":"");
     }
 }
 
