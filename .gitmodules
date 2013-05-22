@@ -4,3 +4,6 @@
 [submodule "libs/PHPMailer"]
 	path = libs/PHPMailer
 	url = git@github.com:duxins/PHPMailer.git
+[submodule "libs/logger"]
+	path = libs/logger
+	url = git@github.com:duxins/php-logger.git
