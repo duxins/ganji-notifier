@@ -29,7 +29,7 @@ class Wuba{
                 continue;
             }
             
-            if(!preg_match("#<a href=\"([^<]*)\"[^>]*class=\"t\"\s+>(.*)</a>#isU", $item[0], $match)){
+            if(!preg_match("#<a href=\"([^<]*)\"[^>]*class=\"t\"[^>]*>(.*)</a>#isU", $item[0], $match)){
                 continue;
             }
 
